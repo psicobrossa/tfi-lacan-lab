@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Asistente Lacaniano v3</title>
+<style>
+:root{
+  --magenta:#E50055;
+  --magenta-dark:#C00052;
+  --magenta-light:#EA3276;
+  --black:#1C1B22;
+  --white:#FFFFFF;
+  --background:#F7F7F8;
+}
+body{font-family:Georgia,serif;background:var(--background);color:var(--black);max-width:800px;margin:0 auto;padding:2rem;}
+.topbar{background:var(--black);color:var(--white);padding:1.5rem;text-align:center;border-radius:0 0 8px 8px;border-bottom:3px solid var(--magenta);}
+.container{margin-top:2rem;}
+label{display:block;font-weight:600;margin:1rem 0 .3rem;}
+textarea{width:100%;padding:.8rem;border:1px solid #ddd;border-radius:6px;font-family:inherit;}
+button{background:var(--magenta);color:var(--white);border:none;padding:.7rem 1.6rem;border-radius:6px;cursor:pointer;font-weight:600;}
+button:hover{background:var(--magenta-dark);}
+button:disabled{background:#ccc;cursor:not-allowed;}
+.resultado{margin-top:2rem;background:#fff;border:1px solid #e4dbca;border-left:4px solid var(--magenta);border-radius:8px;padding:1.5rem;white-space:pre-wrap;}
+.oculto{display:none;}
+.alerta{background:#fbe6df;border:1px solid var(--magenta);padding:.7rem 1rem;border-radius:6px;color:var(--magenta-dark);}
+.checkbox-label{display:flex;align-items:center;gap:.5rem;margin:1rem 0;}
+select{padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;}
+.modo-selector{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Psicobrossa · Formación</h1><p style="opacity:.9;">Herramienta de apoyo para la enseñanza del psicoanálisis lacaniano</p></div>
+<div class="container">
+  <div class="modo-selector">
+    <label>Modo:</label>
+    <select id="modo">
+      <option value="lectura_preliminar">Lectura Preliminar</option>
+      <option value="formacion">Formación</option>
+      <option value="docente">Docente</option>
+    </select>
+  </div>
+  <label>Viñeta clínica (anonimizada)</label>
+  <textarea id="vineta" rows="6" placeholder="Pegá aquí la viñeta..."></textarea>
+  <label class="checkbox-label"><input type="checkbox" id="confirma"> Confirmo que la viñeta está anonimizada.</label>
+  <button id="btnAnalizar">Analizar</button>
+  <div id="resultado" class="resultado oculto"></div>
+  <div id="alerta" class="alerta oculto"></div>
+</div>
+<script>
+// v3 — camino n8n + API paga de Claude.
+// El frontend llama DIRECTO al webhook de n8n (sin pasar por server.js/Express)
+// para poder comparar este camino contra el de Ollama local (server.js original, intacto).
+const N8N_WEBHOOK_URL = 'https://psicobrossa.app.n8n.cloud/webhook/lacan-analizar';
+
+const btn = document.getElementById('btnAnalizar');
+const vineta = document.getElementById('vineta');
+const checkbox = document.getElementById('confirma');
+const resultado = document.getElementById('resultado');
+const alerta = document.getElementById('alerta');
+const modo = document.getElementById('modo');
+
+btn.addEventListener('click', async () => {
+  if (!checkbox.checked) return alert('Debes confirmar la anonimización.');
+  if (vineta.value.trim().length < 20) return alert('Viñeta muy corta.');
+  btn.disabled = true; btn.textContent = 'Procesando...';
+  try {
+    const res = await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: modo.value,
+        clinical_case: vineta.value,
+        anonymized: checkbox.checked
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error en el webhook de n8n');
+
+    resultado.classList.remove('oculto');
+    resultado.textContent = JSON.stringify(data.lacanian_data || data, null, 2);
+
+    if (data.status === 'error' && data.validationDetails?.length) {
+      alerta.classList.remove('oculto');
+      alerta.textContent = '⚠️ ' + data.validationDetails.join(' · ');
+    } else {
+      alerta.classList.add('oculto');
+    }
+  } catch (e) { alert('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Analizar'; }
+});
+</script>
+</body>
+</html>

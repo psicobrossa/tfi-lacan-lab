@@ -1,0 +1,14 @@
+{
+  "name": "asistente-lacaniano-ia",
+  "version": "2.0.0",
+  "description": "Asistente de Analisis Discursivo para la Formulacion de Casos en Psicoanalisis Lacaniano - version local con Ollama",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "author": "Cristian D. Brossa (Psicobrossa)",
+  "license": "MIT"
+}

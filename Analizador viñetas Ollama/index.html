@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Asistente Lacaniano — Psicobrossa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --terracota: #C1653A;
+    --terracota-oscuro: #9E4E2A;
+    --papel: #F7F2EA;
+    --papel-oscuro: #EDE4D6;
+    --tinta: #2B2622;
+    --tinta-suave: #5C5347;
+    --borde: #D9CBB8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+
+  .contenedor {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  header .marca {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--terracota);
+    font-weight: 600;
+  }
+
+  header h1 {
+    font-family: 'Lora', serif;
+    font-size: 32px;
+    font-weight: 600;
+    margin: 8px 0 12px;
+  }
+
+  header p {
+    color: var(--tinta-suave);
+    font-size: 15px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .aviso {
+    background: var(--papel-oscuro);
+    border-left: 3px solid var(--terracota);
+    padding: 16px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--tinta-suave);
+    margin-bottom: 32px;
+  }
+
+  .tarjeta {
+    background: white;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+
+  label {
+    display: block;
+    font-family: 'Lora', serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14.5px;
+    resize: vertical;
+    background: var(--papel);
+    color: var(--tinta);
+  }
+
+  textarea:focus { outline: 2px solid var(--terracota); outline-offset: 1px; }
+
+  .checkbox-fila {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 18px 0 4px;
+    font-size: 13.5px;
+    color: var(--tinta-suave);
+  }
+
+  .checkbox-fila input { margin-top: 3px; }
+
+  button {
+    background: var(--terracota);
+    color: white;
+    border: none;
+    padding: 13px 28px;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: background 0.15s;
+  }
+
+  button:hover:not(:disabled) { background: var(--terracota-oscuro); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #resultado {
+    display: none;
+    white-space: pre-wrap;
+    font-family: 'Lora', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  #estado {
+    display: none;
+    color: var(--tinta-suave);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  #error {
+    display: none;
+    background: #FBEAE5;
+    border-left: 3px solid #C0392B;
+    padding: 14px 18px;
+    border-radius: 4px;
+    color: #8B2E1F;
+    font-size: 14px;
+  }
+
+  #alertaVocabulario {
+    background: #FDF3E3;
+    border-left: 3px solid #C1653A;
+    padding: 12px 16px;
+    border-radius: 4px;
+    color: #7A4A2A;
+    font-size: 13.5px;
+    margin-bottom: 18px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--tinta-suave);
+    margin-top: 48px;
+  }
+</style>
+</head>
+<body>
+  <div class="contenedor">
+    <header>
+      <div class="marca">Psicobrossa</div>
+      <h1>Asistente de Análisis Discursivo</h1>
+      <p>Herramienta de apoyo para la formulación de casos en psicoanálisis de orientación lacaniana. Corre 100% local en tu computadora.</p>
+    </header>
+
+    <div class="aviso">
+      Esta herramienta es un <strong>apoyo</strong> a la elaboración clínica del analista. No diagnostica, no reemplaza el acto clínico ni la supervisión. El modelo corre localmente con Ollama: ningún dato sale de tu computadora.
+    </div>
+
+    <div class="tarjeta">
+      <label for="vineta">Viñeta clínica anonimizada</label>
+      <textarea id="vineta" placeholder="Pegá aquí la viñeta clínica, ya anonimizada (sin nombres reales, datos identificatorios, ni información que permita reconocer al paciente)..."></textarea>
+
+      <div class="checkbox-fila">
+        <input type="checkbox" id="confirmacion" />
+        <label for="confirmacion" style="font-weight:400; font-size:13.5px; margin:0;">
+          Confirmo que la viñeta ingresada está completamente anonimizada y no contiene datos que permitan identificar al paciente.
+        </label>
+      </div>
+
+      <button id="btnAnalizar">Analizar viñeta</button>
+      <div id="estado">Analizando con el modelo local (puede tardar uno o dos minutos)...</div>
+      <div id="error"></div>
+    </div>
+
+    <div class="tarjeta" id="tarjetaResultado" style="display:none;">
+      <label>Análisis</label>
+      <div id="alertaVocabulario" style="display:none;"></div>
+      <div id="resultado"></div>
+    </div>
+
+    <footer>
+      Asistente de Análisis Discursivo · TFI — Diplomatura en IA Aplicada a Entornos Digitales de Gestión (FCE-UBA) · Cristian D. Brossa
+    </footer>
+  </div>
+
+<script>
+  const btn = document.getElementById("btnAnalizar");
+  const vineta = document.getElementById("vineta");
+  const confirmacion = document.getElementById("confirmacion");
+  const estado = document.getElementById("estado");
+  const error = document.getElementById("error");
+  const tarjetaResultado = document.getElementById("tarjetaResultado");
+  const resultado = document.getElementById("resultado");
+  const alertaVocabulario = document.getElementById("alertaVocabulario");
+
+  btn.addEventListener("click", async () => {
+    error.style.display = "none";
+    tarjetaResultado.style.display = "none";
+
+    if (!confirmacion.checked) {
+      error.textContent = "Debés confirmar que la viñeta está anonimizada antes de continuar.";
+      error.style.display = "block";
+      return;
+    }
+
+    if (vineta.value.trim().length < 20) {
+      error.textContent = "La viñeta es demasiado breve. Agregá más contexto clínico.";
+      error.style.display = "block";
+      return;
+    }
+
+    btn.disabled = true;
+    estado.style.display = "block";
+
+    try {
+      const res = await fetch("/api/analizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vineta: vineta.value,
+          confirmaAnonimizacion: confirmacion.checked,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Error desconocido");
+      }
+
+      resultado.textContent = data.analisis;
+      resultado.style.display = "block";
+
+      if (data.alerta) {
+        alertaVocabulario.textContent = "⚠ " + data.alerta;
+        alertaVocabulario.style.display = "block";
+      } else {
+        alertaVocabulario.style.display = "none";
+      }
+
+      tarjetaResultado.style.display = "block";
+    } catch (e) {
+      error.textContent = e.message;
+      error.style.display = "block";
+    } finally {
+      btn.disabled = false;
+      estado.style.display = "none";
+    }
+  });
+</script>
+</body>
+</html>

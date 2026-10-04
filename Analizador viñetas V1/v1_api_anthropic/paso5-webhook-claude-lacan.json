@@ -1,0 +1,150 @@
+{
+  "name": "Lacan - Webhook + Claude (paso 5)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lacan-analizar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "lacan-analizar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "cond-mode", "leftValue": "={{$json.body.mode}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "id": "cond-case", "leftValue": "={{$json.body.clinical_case}}", "rightValue": 20, "operator": { "type": "string", "operation": "lengthGte" } },
+            { "id": "cond-anon", "leftValue": "={{$json.body.anonymized}}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-validate",
+      "name": "Validar payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-5\",\n  max_tokens: 1024,\n  system: \"Eres un sistema de procesamiento de textos clínicos anclado EXCLUSIVAMENTE en el psicoanálisis lacaniano. Está terminantemente prohibido utilizar psicologismos (autoestima, codependencia, emociones, trauma en sentido común).\\n\\nInstrucciones inamovibles:\\n1. Formato de salida: Responde ÚNICAMENTE con un objeto JSON válido. Sin texto extra, sin \\`\\`\\`json, solo el objeto.\\n2. Registros a mapear: Debes reducir el texto del sujeto a los siguientes campos lacanianos estrictos en el JSON:\\n   - semblante_imaginario: (string) El yo ideal o máscara que presenta.\\n   - falta_en_el_otro: (string) Qué significante del Otro barrado irrumpe en su discurso.\\n   - objeto_a: (string) Aquello que funciona como causa de su deseo o punto de goce.\\n   - nombre_del_padre: (string) Cómo funciona (o falla) la metáfora paterna en su estructura.\\n   - discurso_operatorio: (string) Uno de: Amo, Universidad, Histérica, Analista.\\n   - sintoma_anudamiento: (string) Describir el síntoma como aquello que anuda lo Real, Simbólico e Imaginario.\\n3. Si el texto es insuficiente o ambiguo, status debe ser 'error' y validationDetails debe explicar qué falta.\\n4. Estructura obligatoria: {status, lacanian_data: {semblante_imaginario, falta_en_el_otro, objeto_a, nombre_del_padre, discurso_operatorio, sintoma_anudamiento}, validationDetails: []}\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Modo: \" + $json.body.mode + \"\\n\\nViñeta clínica:\\n\" + $json.body.clinical_case\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "http-claude",
+      "name": "Claude - Analisis Lacaniano",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_ID_CREDENCIAL",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae el texto de la respuesta de Claude y valida contra el esquema lacaniano\nconst response = $input.first().json;\nconst rawText = response?.content?.[0]?.text || '';\n\nlet parsed;\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  return [{ json: { status: 'error', validationDetails: ['La respuesta de Claude no es JSON válido: ' + e.message], raw: rawText } }];\n}\n\nconst requiredFields = ['semblante_imaginario', 'falta_en_el_otro', 'objeto_a', 'nombre_del_padre', 'discurso_operatorio', 'sintoma_anudamiento'];\nconst validDiscursos = ['Amo', 'Universidad', 'Histérica', 'Analista'];\nconst errors = [];\n\nconst data = parsed.lacanian_data || {};\nfor (const field of requiredFields) {\n  if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {\n    errors.push(`Campo faltante o vacío: ${field}`);\n  }\n}\nif (data.discurso_operatorio && !validDiscursos.includes(data.discurso_operatorio)) {\n  errors.push(`discurso_operatorio inválido: ${data.discurso_operatorio}`);\n}\n\nif (errors.length > 0 || parsed.status === 'error') {\n  return [{ json: { status: 'error', validationDetails: errors.length ? errors : (parsed.validationDetails || ['Error no especificado']) } }];\n}\n\nreturn [{ json: { status: 'success', lacanian_data: data, validationDetails: [] } }];"
+      },
+      "id": "code-validate",
+      "name": "Validar respuesta Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "cond-status", "leftValue": "={{$json.status}}", "rightValue": "success", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "Es válido",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1140, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 422,
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-validation-error",
+      "name": "Respond Error Validacion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ { status: \"error\", validationDetails: [\"Payload inválido: revisar mode, clinical_case (min 20 caracteres) y anonymized=true\"] } }}",
+        "options": {}
+      },
+      "id": "respond-error",
+      "name": "Respond Error Payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 460]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[ { "node": "Validar payload", "type": "main", "index": 0 } ]] },
+    "Validar payload": {
+      "main": [
+        [ { "node": "Claude - Analisis Lacaniano", "type": "main", "index": 0 } ],
+        [ { "node": "Respond Error Payload", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Claude - Analisis Lacaniano": { "main": [[ { "node": "Validar respuesta Claude", "type": "main", "index": 0 } ]] },
+    "Validar respuesta Claude": { "main": [[ { "node": "Es válido", "type": "main", "index": 0 } ]] },
+    "Es válido": {
+      "main": [
+        [ { "node": "Respond OK", "type": "main", "index": 0 } ],
+        [ { "node": "Respond Error Validacion", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}

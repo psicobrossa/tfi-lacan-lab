@@ -1,0 +1,759 @@
+{
+  "name": "\"LACAN-LAB V7 Multiagente (POST) - Files API\"",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ea3addd7-ac27-4db1-a1b3-176af92f0572",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "827b46df-8a7a-4049-a5fd-2dd0eaaabad1",
+      "name": "Webhook (Pregunta)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        1184
+      ],
+      "webhookId": "ea3addd7-ac27-4db1-a1b3-176af92f0572"
+    },
+    {
+      "parameters": {
+        "jsCode": "const corpus = [\n  { titulo: 'Bassols', file_id: 'file_01MqRE2T9LBdCHTjDZnoz92k' },\n  { titulo: 'Schejtman', file_id: 'file_011uSGPHuArdMvxRyvRKp8Tg' },\n  { titulo: 'Campolongo', file_id: 'file_011tueMq3JeaMXfow7GfjjVS' },\n  { titulo: 'Freud Padre', file_id: 'file_013U9CkbvDzXqhBGT92X2YfZ' }\n];\n\nconst documentos = corpus.map(doc => ({\n  type: 'document',\n  source: { type: 'file', file_id: doc.file_id },\n  title: doc.titulo,\n  citations: { enabled: true }\n}));\n\nreturn [{\n  json: {\n    pregunta: $('Webhook (Pregunta)').item.json.body.pregunta,\n    documentos: documentos\n  }\n}];\n "
+      },
+      "id": "3d481518-30b2-4bed-979b-ecbad71c2711",
+      "name": "Armar documentos (file_id)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": 
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c63ef8dc-6ae9-40fb-9284-07fb0a456ab4",
+      "name": "V1 - Investigador (Sonnet)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4336,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $json.content || [];\nlet texto = '';\nconst citas = [];\n\nfor (const block of blocks) {\n  if (block.type === 'text') {\n    texto += block.text;\n    if (block.citations) {\n      for (const c of block.citations) {\n        citas.push({\n          texto_citado: c.cited_text,\n          documento: c.document_title || c.document_index\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { respuesta_v1_texto: texto, citas_v1: citas } }];"
+      },
+      "id": "3e65bd77-6a69-4cbe-9395-236f67520739",
+      "name": "Extraer respuesta V1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4576,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-haiku-4-5-20251001\",\n  max_tokens: 2048,\n  system: \"Sos el Auditor de Fuentes (V2) de LACAN·LAB. Revisás la respuesta del Investigador (V1). Como V1 usa citas nativas verificadas por la API, NO necesitás chequear si las citas existen o si las páginas son correctas: eso ya está garantizado estructuralmente. Tu trabajo se concentra en un solo eje: TEORIA. Evaluá: atribución correcta de conceptos a sus autores (no mezclar Lacan con Miller, ni Freud con Schejtman salvo que el corpus lo indique), anacronismos conceptuales, acuerdos artificiales entre autores donde no los hay, y si V1 distingue claramente entre lo que la fuente dice literalmente y lo que infiere. Formato de salida: veredicto con semaforo (verde/amarillo/rojo) y un parrafo breve de justificacion. No agregues ejes de fuentes ni alucinacion.\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Pregunta original: \" + $('Armar documentos (file_id)').item.json.pregunta + \"\\n\\nRespuesta del Investigador (V1):\\n\" + $json.respuesta_v1_texto\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "bf39c140-6227-4ace-8168-6644a1b8d53d",
+      "name": "V2 - Auditor (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4816,
+        1184
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "7eymkUCDRf8rlLvw",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $json.content || [];\nlet auditoria = '';\nfor (const block of blocks) {\n  if (block.type === 'text') auditoria += block.text;\n}\n\nreturn [{\n  json: {\n    pregunta: $('Armar documentos (file_id)').item.json.pregunta,\n    respuesta_v1: $('Extraer respuesta V1').item.json.respuesta_v1_texto,\n    citas_v1: $('Extraer respuesta V1').item.json.citas_v1,\n    auditoria_v2: auditoria,\n    tipo: 'investigacion'\n  }\n}];"
+      },
+      "id": "070f169d-a02f-4e18-a65b-8d099ea809e5",
+      "name": "Extraer respuesta V2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5056,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "60eb3764-589a-4016-a7c7-03065c3b30a8",
+      "name": "Responder al Usuario",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        5296,
+        1184
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Autores conocidos en el corpus (Files API) — LACAN·LAB\nconst autoresConocidos = [\n  \"lacan\", \"miller\", \"freud\", \"bassols\", \"schejtman\", \"campolongo\"\n];\n\n// Patrones típicos de una afirmación a verificar\nconst patronesVerificacion = [\n  /es cierto que/i,\n  /es verdad que/i,\n  /confirmá si/i,\n  /confirmar si/i,\n  /verificá si/i,\n  /verificar si/i,\n  /¿(es|fue|dijo|planteó|sostuvo)\\b.*\\?/i,\n  /según (lacan|freud|miller|bassols|schejtman|campolongo)/i\n];\n\nconst pregunta = $input.first().json.pregunta || \"\";\nconst preguntaLower = pregunta.toLowerCase();\n\n// Contar cuántos autores conocidos aparecen mencionados\nconst autoresDetectados = autoresConocidos.filter(autor =>\n  preguntaLower.includes(autor)\n);\n\nconst dos_autores_detectados = autoresDetectados.length >= 2;\nconst patron_verificacion_detectado = patronesVerificacion.some(regex =>\n  regex.test(pregunta)\n);\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    dos_autores_detectados,\n    patron_verificacion_detectado,\n    autores_detectados: autoresDetectados\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3872,
+        1184
+      ],
+      "id": "93caf90d-6d94-40b8-af99-b04f1d819632",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lista de autores conocidos en el corpus (Files API + Biblioteca LACAN·LAB)\nconst autoresConocidos = [\n  \"lacan\", \"freud\", \"miller\", \"bassols\", \"schejtman\", \"campolongo\"\n];\n\n// Patrones típicos de una afirmación a verificar\nconst patronesVerificacion = [\n  /es cierto que/i,\n  /es verdad que/i,\n  /confirmá si/i,\n  /confirmar si/i,\n  /verificá si/i,\n  /verificar si/i,\n  /¿(es|fue|dijo|planteó|sostuvo)\\b.*\\?/i,\n  /según (lacan|freud|miller|bassols|schejtman|campolongo)/i\n];\n\nconst pregunta = $input.first().json.pregunta || \"\";\nconst preguntaLower = pregunta.toLowerCase();\n\n// Contar cuántos autores conocidos aparecen mencionados\nconst autoresDetectados = autoresConocidos.filter(autor =>\n  preguntaLower.includes(autor)\n);\n\nconst dos_autores_detectados = autoresDetectados.length >= 2;\nconst patron_verificacion_detectado = patronesVerificacion.some(regex =>\n  regex.test(pregunta)\n);\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    dos_autores_detectados,\n    patron_verificacion_detectado,\n    autores_detectados: autoresDetectados\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3648,
+        1184
+      ],
+      "id": "a38d2086-b5c1-4013-86c4-75f5ac4a48e0",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "692e346a-f5de-488c-86b2-62dd4bb1a8ba",
+                    "leftValue": "={{ $json.dos_autores_detectados && $json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Paralelo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "114895c5-3c48-4963-b8bd-220d172a001d",
+                    "leftValue": "={{ $json.dos_autores_detectados && !$json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Comparador"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "75b07d0f-88bd-4aa6-a44d-cf460faee1b1",
+                    "leftValue": "={{ !$json.dos_autores_detectados && $json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Verificador"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "",
+          "allMatchingOutputs": false
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        4048,
+        1152
+      ],
+      "id": "89fb1771-6a5f-4e50-b2a4-71698095137e",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const corpus = [\n  { titulo: 'Bassols',     file_id: 'file_01MqRE2T9LBdCHTjDZnoz92k' },\n  { titulo: 'Schejtman',   file_id: 'file_011uSGPHuArdMvxRyvRKp8Tg' },\n  { titulo: 'Campolongo',  file_id: 'file_011tueMq3JeaMXfow7GfjjVS' },\n  { titulo: 'Freud Padre', file_id: 'file_013U9CkbvDzXqhBGT92X2YfZ' }\n];\n\nconst deteccion = $('Code in JavaScript1').item.json;\nconst autores = deteccion.autores_detectados || [];\nconst [autorA, autorB] = autores;\n\nfunction buscarDocumento(nombreAutor) {\n  if (!nombreAutor) return null;\n  const norm = nombreAutor.toLowerCase();\n  return corpus.find(doc => doc.titulo.toLowerCase().includes(norm)) || null;\n}\n\nconst docA = buscarDocumento(autorA);\nconst docB = buscarDocumento(autorB);\nconst encontrados = [docA, docB].filter(Boolean);\nconst faltantes = [autorA, autorB].filter((_, i) => ![docA, docB][i]);\n\nconst documentos_comparador = encontrados.map(doc => ({\n  type: \"document\",\n  source: { type: \"file\", file_id: doc.file_id },\n  title: doc.titulo,\n  citations: { enabled: true }\n}));\n\nreturn [{\n  json: {\n    ...deteccion,\n    documentos_comparador,\n    autor_a_encontrado: !!docA,\n    autor_b_encontrado: !!docB,\n    autores_faltantes: faltantes\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        1440
+      ],
+      "id": "d8f5f889-1dbc-44eb-9236-813b188741fb",
+      "name": "Filtrar documentos - Comparador"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": 
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"system\": \"Sos un asistente especializado en comparar la obra de dos autores lacanianos a partir EXCLUSIVAMENTE de los documentos adjuntos. Reglas estrictas: (1) NUNCA atribuyas una idea, cita o formulación a un autor si no aparece literalmente en SU documento correspondiente — la atribución cruzada entre autores es el error más grave que podés cometer. (2) Si un concepto aparece en un solo documento y no en el otro, decilo explícitamente en vez de inferir que el segundo autor 'probablemente coincide'. (3) Estructurá la respuesta en exactamente tres secciones: Coincidencias, Diferencias, Evolución del concepto (si aplica). (4) Máximo 250 palabras en total. (5) Devolvé ÚNICAMENTE un JSON válido, sin texto adicional antes o después, con esta forma exacta: { \\\"respuesta_texto\\\": string, \\\"citas\\\": [ { \\\"autor\\\": string, \\\"documento\\\": string, \\\"cita\\\": string } ], \\\"tipo\\\": \\\"comparacion\\\", \\\"autor_a_encontrado\\\": boolean, \\\"autor_b_encontrado\\\": boolean }\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify([...$json.documentos_comparador, { type: \"text\", text: $json.pregunta }]) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "9614bfd9-3a24-4e7b-9dba-39db1986e53f",
+      "name": "V3 - Comparador (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4592,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const respuestaClaude = $input.item.json;\n\nlet textoCrudo = '';\ntry {\n  textoCrudo = respuestaClaude.content?.[0]?.text || '';\n} catch (e) {\n  textoCrudo = '';\n}\n\nfunction limpiarFences(texto) {\n  return texto\n    .replace(/^```json\\s*/i, '')\n    .replace(/^```\\s*/, '')\n    .replace(/```\\s*$/, '')\n    .trim();\n}\n\nconst textoLimpio = limpiarFences(textoCrudo);\nconst original = $('Filtrar documentos - Comparador').item.json;\n\nlet parsed;\nlet parseoExitoso = true;\n\ntry {\n  parsed = JSON.parse(textoLimpio);\n} catch (e) {\n  parseoExitoso = false;\n  parsed = {\n    respuesta_texto: textoCrudo || 'Error: no se pudo parsear la respuesta de Claude.',\n    citas: [],\n    tipo: 'comparacion'\n  };\n}\n\nreturn [{\n  json: {\n    pregunta: original.pregunta,\n    autores_detectados: original.autores_detectados,\n    autores_faltantes: original.autores_faltantes || [],\n\n    respuesta_texto: parsed.respuesta_texto ?? '',\n    citas: parsed.citas ?? [],\n    tipo: parsed.tipo ?? 'comparacion',\n\n    autor_a_encontrado: original.autor_a_encontrado ?? false,\n    autor_b_encontrado: original.autor_b_encontrado ?? false,\n\n    concepto_encontrado_autor_a: parsed.autor_a_encontrado ?? null,\n    concepto_encontrado_autor_b: parsed.autor_b_encontrado ?? null,\n\n    parseo_exitoso: parseoExitoso,\n    raw_response_debug: parseoExitoso ? undefined : textoCrudo,\n\n    es_paralelo: !!(original.dos_autores_detectados && original.patron_verificacion_detectado)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4816,
+        1424
+      ],
+      "id": "393141b7-0d31-45b8-afd0-2835563019dd",
+      "name": "Extraer respuesta Comparador"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\n\nconst autoresDetectados = data.autores_detectados || [];\nlet documentosFiltrados;\nlet autorObjetivo = null;\nlet autorEncontrado = null; // null = no aplica (fallback, sin autor detectado)\n\nif (autoresDetectados.length === 1) {\n  autorObjetivo = autoresDetectados[0];\n  documentosFiltrados = data.documentos.filter(\n    doc => doc.title.toLowerCase() === autorObjetivo.toLowerCase()\n  );\n  autorEncontrado = documentosFiltrados.length > 0;\n} else {\n  documentosFiltrados = data.documentos;\n}\n\nreturn {\n  json: {\n    pregunta: data.pregunta,\n    documentos: documentosFiltrados,\n    autor_objetivo: autorObjetivo,\n    autor_encontrado: autorEncontrado,\n    dos_autores_detectados: data.dos_autores_detectados,\n    patron_verificacion_detectado: data.patron_verificacion_detectado\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4256,
+        912
+      ],
+      "id": "874ecdcb-46f8-48fd-b641-cfaebbea4710",
+      "name": "Filtrar documentos - Verificador"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"system\": \"Sos un asistente especializado en verificar afirmaciones sobre la obra de autores lacanianos a partir EXCLUSIVAMENTE de los documentos adjuntos. Reglas estrictas: (1) Basate únicamente en lo que aparece literalmente en los documentos provistos — nunca completes con conocimiento general ni asumas que un autor sostiene algo que no está en su texto. (2) Si los documentos no contienen evidencia relacionada con la afirmación, el veredicto es NO_ENCONTRADO, no CONTRADICHO. (3) Si la afirmación es cierta solo en parte, usá PARCIALMENTE_CONFIRMADO e indicá en respuesta_texto qué parte está respaldada y qué parte no. (4) La entrada puede llegarte como pregunta interrogativa (\\\"¿es cierto que...?\\\") o como afirmación ya declarativa — extraé el contenido verificable en cualquiera de los dos formatos. (5) Máximo 200 palabras en total. (6) Devolvé ÚNICAMENTE un JSON válido, sin texto adicional antes o después, con esta forma exacta: { \\\"veredicto\\\": \\\"CONFIRMADO\\\" | \\\"PARCIALMENTE_CONFIRMADO\\\" | \\\"NO_ENCONTRADO\\\" | \\\"CONTRADICHO\\\", \\\"respuesta_texto\\\": string, \\\"citas\\\": [ { \\\"autor\\\": string, \\\"documento\\\": string, \\\"cita\\\": string } ], \\\"tipo\\\": \\\"verificacion\\\" }\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify([...$json.documentos, { type: \"text\", text: $json.pregunta }]) }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "c49fdf07-8a16-421f-8b03-5ed70627b27f",
+      "name": "V4 - Verificador (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4512,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const respuestaClaude = $input.item.json.content[0].text;\nconst previos = $('Filtrar documentos - Verificador').item.json;\n\nlet texto = respuestaClaude.trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/```\\s*$/i, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(texto);\n} catch (e) {\n  parsed = {\n    veredicto: 'NO_ENCONTRADO',\n    respuesta_texto: respuestaClaude,\n    citas: [],\n    error_parseo: true\n  };\n}\n\nreturn {\n  json: {\n    pregunta: previos.pregunta,\n    autor_objetivo: previos.autor_objetivo,\n    autor_encontrado: previos.autor_encontrado,\n    veredicto: parsed.veredicto,\n    respuesta_texto: parsed.respuesta_texto,\n    citas: parsed.citas || [],\n    tipo: 'verificacion',\n    es_paralelo: !!(previos.dos_autores_detectados && previos.patron_verificacion_detectado)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4736,
+        912
+      ],
+      "id": "bd2afaa6-063f-4dca-85dc-d498943367f1",
+      "name": "Extraer respuesta Verificador"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "01e03029-7234-44f4-b95a-fae0eb72a445",
+              "leftValue": "={{ $json.es_paralelo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4960,
+        912
+      ],
+      "id": "b6041e20-9fcd-4f64-ae47-8f486a9eac9a",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b1c85951-a6c5-47fd-a10f-698580ab3b6d",
+              "leftValue": "={{ $json.es_paralelo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5040,
+        1424
+      ],
+      "id": "9627d0f4-dd4d-409a-bb84-bc5c87937064",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5264,
+        864
+      ],
+      "id": "5b24b40a-d1bc-4605-93c4-6db8bbadaf79",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const verificador = $('Extraer respuesta Verificador').item.json;\nconst comparador = $('Extraer respuesta Comparador').item.json;\n\nreturn [{\n  json: {\n    pregunta: verificador.pregunta || comparador.pregunta,\n    tipo: 'paralelo',\n\n    // Verificación\n    autor_objetivo: verificador.autor_objetivo,\n    autor_encontrado: verificador.autor_encontrado,\n    veredicto: verificador.veredicto,\n    respuesta_verificacion: verificador.respuesta_texto,\n    citas_verificacion: verificador.citas || [],\n\n    // Comparación\n    autores_detectados: comparador.autores_detectados,\n    autores_faltantes: comparador.autores_faltantes || [],\n    respuesta_comparacion: comparador.respuesta_texto,\n    citas_comparacion: comparador.citas || [],\n    autor_a_encontrado: comparador.autor_a_encontrado,\n    autor_b_encontrado: comparador.autor_b_encontrado\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5488,
+        864
+      ],
+      "id": "1e4ed96f-8413-4345-bbf3-6f824361a3e8",
+      "name": "Code in JavaScript2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (Pregunta)": {
+      "main": [
+        [
+          {
+            "node": "Armar documentos (file_id)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar documentos (file_id)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V1 - Investigador (Sonnet)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta V1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta V1": {
+      "main": [
+        [
+          {
+            "node": "V2 - Auditor (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V2 - Auditor (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta V2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta V2": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Filtrar documentos - Verificador",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtrar documentos - Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filtrar documentos - Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filtrar documentos - Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "V1 - Investigador (Sonnet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar documentos - Comparador": {
+      "main": [
+        [
+          {
+            "node": "V3 - Comparador (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V3 - Comparador (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar documentos - Verificador": {
+      "main": [
+        [
+          {
+            "node": "V4 - Verificador (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V4 - Verificador (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta Comparador": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta Verificador": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "61184c9e-c52a-4f19-bb1b-e1d90a66d398",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6d1dfce4adf5186fb9e9e6a482b6c921a35720a616351e2a4dc24a1ca1e99a75"
+  },
+  "nodeGroups": [],
+  "id": "zYQan8OJY0DkXVW9",
+  "tags": []
+}

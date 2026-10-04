@@ -1,0 +1,283 @@
+{
+  "name": "Lacan - Webhook + Claude (paso 5)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lacan-analizar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "19e1aa13-d998-4ec2-bd06-76a031e9d248",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1424,
+        384
+      ],
+      "webhookId": "lacan-analizar"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-5\",\n  max_tokens: 4096,\n  thinking: { type: \"disabled\" },\n  system: \"Eres un sistema de procesamiento de textos clínicos anclado EXCLUSIVAMENTE en el psicoanálisis lacaniano. Está terminantemente prohibido utilizar psicologismos (autoestima, codependencia, emociones, trauma en sentido común).\\n\\nInstrucciones inamovibles:\\n1. Formato de salida: Responde ÚNICAMENTE con un objeto JSON válido. Sin texto extra, sin \\`\\`\\`json, solo el objeto.\\n2. Registros a mapear: Debes reducir el texto del sujeto a los siguientes campos lacanianos estrictos en el JSON:\\n   - semblante_imaginario: (string) El yo ideal o máscara que presenta.\\n   - falta_en_el_otro: (string) Qué significante del Otro barrado irrumpe en su discurso.\\n   - objeto_a: (string) Aquello que funciona como causa de su deseo o punto de goce.\\n   - nombre_del_padre: (string) Cómo funciona (o falla) la metáfora paterna en su estructura.\\n   - discurso_operatorio: (string) Uno de: Amo, Universidad, Histérica, Analista.\\n   - sintoma_anudamiento: (string) Describir el síntoma como aquello que anuda lo Real, Simbólico e Imaginario.\\n3. Si el texto es insuficiente o ambiguo, status debe ser 'error' y validationDetails debe explicar qué falta.\\n4. Estructura obligatoria: {status, lacanian_data: {semblante_imaginario, falta_en_el_otro, objeto_a, nombre_del_padre, discurso_operatorio, sintoma_anudamiento}, validationDetails: []}\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Modo: \" + $json.body.mode + \"\\n\\nViñeta clínica:\\n\" + $json.body.clinical_case\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "e7a50834-3f47-4c33-a983-9c216b8bf0be",
+      "name": "Claude - Analisis Lacaniano",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -976,
+        288
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "XOlXRmZrOgWnvpgQ",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae el texto de la respuesta de Claude y valida contra el esquema lacaniano\nconst response = $input.first().json;\nlet rawText = response?.content?.find(block => block.type === 'text')?.text || '';\n\n// Limpieza defensiva: a veces el modelo agrega fences de markdown o texto residual\n// antes/después del JSON real, pese a que el prompt lo prohíbe. Extraemos solo\n// el primer objeto JSON completo, contando llaves para encontrar su cierre exacto.\nrawText = rawText.trim();\nconst firstBrace = rawText.indexOf('{');\nif (firstBrace !== -1) {\n  let depth = 0;\n  let endIndex = -1;\n  for (let i = firstBrace; i < rawText.length; i++) {\n    if (rawText[i] === '{') depth++;\n    else if (rawText[i] === '}') {\n      depth--;\n      if (depth === 0) { endIndex = i; break; }\n    }\n  }\n  if (endIndex !== -1) {\n    rawText = rawText.slice(firstBrace, endIndex + 1);\n  }\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  return [{ json: { status: 'error', validationDetails: ['La respuesta de Claude no es JSON válido: ' + e.message], raw: rawText } }];\n}\nconst requiredFields = ['semblante_imaginario', 'falta_en_el_otro', 'objeto_a', 'nombre_del_padre', 'discurso_operatorio', 'sintoma_anudamiento'];\nconst validDiscursos = ['Amo', 'Universidad', 'Histérica', 'Analista'];\nconst errors = [];\nconst data = parsed.lacanian_data || {};\nfor (const field of requiredFields) {\n  if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {\n    errors.push(`Campo faltante o vacío: ${field}`);\n  }\n}\nif (data.discurso_operatorio && !validDiscursos.includes(data.discurso_operatorio)) {\n  errors.push(`discurso_operatorio inválido: ${data.discurso_operatorio}`);\n}\nif (errors.length > 0 || parsed.status === 'error') {\n  return [{ json: { status: 'error', validationDetails: errors.length ? errors : (parsed.validationDetails || ['Error no especificado']) } }];\n}\nreturn [{ json: { status: 'success', lacanian_data: data, validationDetails: [] } }];"
+      },
+      "id": "10eb01e9-e3a2-49f7-8378-01eb6de520ac",
+      "name": "Validar respuesta Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-status",
+              "leftValue": "={{$json.status}}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5d54a553-db6b-4472-b778-9909a1d3de03",
+      "name": "Es válido",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: \"error\", validationDetails: [\"Payload inválido: revisar mode, clinical_case (min 20 caracteres) y anonymized=true\"] } }}",
+        "options": {}
+      },
+      "id": "21dabf48-399f-445b-b85f-1e6c5dc25e7c",
+      "name": "Respond Error Payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -976,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c9c7f3d2-0430-4bae-8b5a-440dbf1f2f8a",
+      "name": "Respond OK1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "3fcffd05-4049-4330-a6a8-bce4183669bb",
+      "name": "Respond Error Validacion1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "052c4935-d907-4137-a037-f8394c7c4dd0",
+              "leftValue": "={{$json.body.mode}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "777de4ff-e96c-440a-a40f-54c70d79e250",
+              "leftValue": "={{$json.body.anonymized}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "2aa11899-2a48-4c27-9b53-a3c4cf1ecdd8",
+              "leftValue": "={{$json.body.clinical_case.length}}",
+              "rightValue": 20,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1200,
+        384
+      ],
+      "id": "10ec2309-17bc-4361-a4d7-bd0139b82921",
+      "name": "Validar payload"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Analisis Lacaniano": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta Claude": {
+      "main": [
+        [
+          {
+            "node": "Es válido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es válido": {
+      "main": [
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error Validacion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar payload": {
+      "main": [
+        [
+          {
+            "node": "Claude - Analisis Lacaniano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e8f72388-33e7-47a2-974e-09b65d9ccbbd",
+  "meta": {
+    "instanceId": "6d1dfce4adf5186fb9e9e6a482b6c921a35720a616351e2a4dc24a1ca1e99a75"
+  },
+  "nodeGroups": [],
+  "id": "DEpJTnFLnZuafgrx",
+  "tags": []
+}

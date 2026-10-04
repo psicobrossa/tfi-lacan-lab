@@ -1,0 +1,119 @@
+{
+  "name": "LACAN-LAB V1+V2 (POST) - Files API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lacan-lab",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook1",
+      "name": "Webhook (Pregunta)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const corpus = [\n  { titulo: 'Bassols', file_id: 'PEGAR_FILE_ID_BASSOLS' },\n  { titulo: 'Schejtman', file_id: 'PEGAR_FILE_ID_SCHEJTMAN' },\n  { titulo: 'Geblesco', file_id: 'PEGAR_FILE_ID_GEBLESCO' },\n  { titulo: 'Documento 4', file_id: 'PEGAR_FILE_ID_DOC4' },\n  { titulo: 'Documento 5', file_id: 'PEGAR_FILE_ID_DOC5' }\n];\n\nconst documentos = corpus.map(doc => ({\n  type: 'document',\n  source: { type: 'file', file_id: doc.file_id },\n  title: doc.titulo,\n  citations: { enabled: true }\n}));\n\nconst pregunta = $json.body.question;\n\nreturn [{ json: { documentos, pregunta } }];"
+      },
+      "id": "code1",
+      "name": "Armar documentos (file_id)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "anthropic-beta", "value": "files-api-2025-04-14" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-5\",\n  max_tokens: 4096,\n  system: \"Sos el Investigador de Fuentes de LACAN·LAB. Respondé EXCLUSIVAMENTE con base en los documentos adjuntos (corpus lacaniano). Si no hay evidencia para responder, decí literalmente: NO ENCONTRADO EN LAS FUENTES DISPONIBLES. Estructurá siempre la respuesta en tres partes: 1) Evidencia directa (cita textual con autor, obra y página cuando sea posible), 2) Inferencia o síntesis (marcando explícitamente que es una deducción tuya y no una cita), 3) Limitaciones (qué no se puede afirmar con las fuentes disponibles). No mezcles conceptos de distintos autores como si fueran equivalentes salvo que el corpus lo haga explícito.\",\n  messages: [\n    {\n      role: \"user\",\n      content: [...$json.documentos, { type: \"text\", text: $json.pregunta }]\n    }\n  ]\n} }}"
+      },
+      "id": "http1",
+      "name": "V1 - Investigador (Sonnet)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 400],
+      "credentials": { "anthropicApi": { "id": "", "name": "Anthropic account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const blocks = $json.content || [];\nlet texto = '';\nconst citas = [];\n\nfor (const block of blocks) {\n  if (block.type === 'text') {\n    texto += block.text;\n    if (block.citations) {\n      for (const c of block.citations) {\n        citas.push({\n          texto_citado: c.cited_text,\n          documento: c.document_title || c.document_index\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { respuesta_v1_texto: texto, citas_v1: citas } }];"
+      },
+      "id": "code2",
+      "name": "Extraer respuesta V1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-haiku-4-5-20251001\",\n  max_tokens: 2048,\n  system: \"Sos el Auditor de Fuentes (V2) de LACAN·LAB. Revisás la respuesta del Investigador (V1). Como V1 usa citas nativas verificadas por la API, NO necesitás chequear si las citas existen o si las páginas son correctas: eso ya está garantizado estructuralmente. Tu trabajo se concentra en un solo eje: TEORIA. Evaluá: atribución correcta de conceptos a sus autores (no mezclar Lacan con Miller, ni Freud con Schejtman salvo que el corpus lo indique), anacronismos conceptuales, acuerdos artificiales entre autores donde no los hay, y si V1 distingue claramente entre lo que la fuente dice literalmente y lo que infiere. Formato de salida: veredicto con semaforo (verde/amarillo/rojo) y un parrafo breve de justificacion. No agregues ejes de fuentes ni alucinacion.\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Pregunta original: \" + $('Armar documentos (file_id)').item.json.pregunta + \"\\n\\nRespuesta del Investigador (V1):\\n\" + $json.respuesta_v1_texto\n    }\n  ]\n} }}"
+      },
+      "id": "http2",
+      "name": "V2 - Auditor (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 400],
+      "credentials": { "anthropicApi": { "id": "", "name": "Anthropic account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const blocks = $json.content || [];\nlet auditoria = '';\nfor (const block of blocks) {\n  if (block.type === 'text') auditoria += block.text;\n}\n\nreturn [{\n  json: {\n    pregunta: $('Armar documentos (file_id)').item.json.pregunta,\n    respuesta_v1: $('Extraer respuesta V1').item.json.respuesta_v1_texto,\n    citas_v1: $('Extraer respuesta V1').item.json.citas_v1,\n    auditoria_v2: auditoria\n  }\n}];"
+      },
+      "id": "code3",
+      "name": "Extraer respuesta V2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond1",
+      "name": "Responder al Usuario",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1640, 400]
+    }
+  ],
+  "connections": {
+    "Webhook (Pregunta)": { "main": [[{ "node": "Armar documentos (file_id)", "type": "main", "index": 0 }]] },
+    "Armar documentos (file_id)": { "main": [[{ "node": "V1 - Investigador (Sonnet)", "type": "main", "index": 0 }]] },
+    "V1 - Investigador (Sonnet)": { "main": [[{ "node": "Extraer respuesta V1", "type": "main", "index": 0 }]] },
+    "Extraer respuesta V1": { "main": [[{ "node": "V2 - Auditor (Haiku)", "type": "main", "index": 0 }]] },
+    "V2 - Auditor (Haiku)": { "main": [[{ "node": "Extraer respuesta V2", "type": "main", "index": 0 }]] },
+    "Extraer respuesta V2": { "main": [[{ "node": "Responder al Usuario", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

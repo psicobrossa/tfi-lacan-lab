@@ -1,0 +1,1477 @@
+{
+  "name": "LACAN-LAB_V7_con_BM25",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ea3addd7-ac27-4db1-a1b3-176af92f0572",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2aa0991e-bffc-4e5a-b87d-8b70715a6333",
+      "name": "Webhook (Pregunta)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -8368,
+        4624
+      ],
+      "webhookId": "90116436-86e4-48af-8a9c-893813c4a133"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? {};\nconst pregunta = typeof body.pregunta === 'string' ? body.pregunta : $json.pregunta;\n\nif (typeof pregunta !== 'string' || pregunta.trim() === '') {\n  return [{ json: { ok: false, error: { code: 'INVALID_INPUT', message: 'La propiedad pregunta debe existir, ser string y no estar vacía.' } } }];\n}\n\nreturn [{ json: { ...$json, ok: true, pregunta: pregunta.trim() } }];"
+      },
+      "id": "b3dc71ed-8ace-4014-9d3b-49a2c550fea0",
+      "name": "Validar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8160,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f6af566-9917-47c8-9877-14d097c08605",
+      "name": "IF entrada válida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -8000,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "a9f5f8e9-545e-4f5c-973e-d011746443f7",
+      "name": "Responder error entrada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -7744,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nfunction cargarMapa() {\n  if (item.file_ids && typeof item.file_ids === 'object') return item.file_ids;\n  try {\n    const m = $('Armar mapa file_ids').first().json.file_ids;\n    if (m && typeof m === 'object') return m;\n  } catch (e) {}\n  return {};\n}\n\nconst fileIds = cargarMapa();\nconst seleccionados = Array.isArray(item.fragmentos_seleccionados) ? item.fragmentos_seleccionados.map(String) : [];\n\nif (!seleccionados.length) {\n  return [{json:{...item, ok:false, documentos:[], documentos_count:0, error:{code:'NO_BM25_FRAGMENTS', message:'El ranking BM25 no encontro fragmentos relevantes para los seminarios detectados.'}}}];\n}\n\nfunction seminarioDe(nombre) {\n  const m = /^S0*(\\d{1,2})(bis)?_p\\d+-\\d+\\.pdf$/i.exec(nombre);\n  return m ? String(Number(m[1])) + (m[2] ? 'bis' : '') : null;\n}\nfunction rangoDe(nombre) {\n  const m = /_p(\\d+)-(\\d+)\\.pdf$/i.exec(nombre);\n  return m ? {desde:Number(m[1]), hasta:Number(m[2])} : null;\n}\n\nconst documentos = [];\nfor (const archivo of seleccionados) {\n  const fileId = fileIds[archivo];\n  const sem = seminarioDe(archivo);\n  const rango = rangoDe(archivo);\n  if (!sem || !rango || typeof fileId !== 'string' || !fileId.trim()) continue;\n  documentos.push({\n    type: 'document',\n    source: {type:'file', file_id:fileId},\n    title: `Seminario ${sem} \\u2014 ${archivo} \\u2014 paginas originales ${rango.desde}-${rango.hasta}`,\n    citations: {enabled:true},\n    metadata: {seminario:sem, archivo, pagina_desde:rango.desde, pagina_hasta:rango.hasta}\n  });\n}\n\nif (!documentos.length) {\n  return [{json:{...item, ok:false, documentos:[], documentos_count:0, error:{code:'NO_SEMINAR_DOCUMENTS', message:'Los fragmentos seleccionados por BM25 no tienen file_id en lacan_file_ids. Verifica la tabla o el mapa de file_ids.'}}}];\n}\nreturn [{json:{...item, ok:true, documentos, documentos_count:documentos.length, corpus_tipo:'seminarios_originales'}}];"
+      },
+      "id": "f448b4e5-eec3-4b4b-a69a-7d18b9be379d",
+      "name": "Armar documentos (file_id)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7312,
+        4592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $json.pregunta.toLowerCase();\nconst externos = ['buscá en internet','busca en internet','investigá afuera','investiga afuera','fuentes externas','literatura reciente','actualidad','artículos recientes','búsqueda externa','busqueda externa','google'];\nconst intencion = externos.some(x => p.includes(x)) ? 'investigacion_externa' : 'documental';\nreturn [{ json: { ...$json, intencion } }];"
+      },
+      "id": "a619ca3c-f988-4d41-b1e6-9f0a428c64d2",
+      "name": "Clasificar intención",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7056,
+        4640
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.dos_seminarios_detectados && $json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Paralelo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.dos_seminarios_detectados && !$json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Comparador"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ !$json.dos_seminarios_detectados && $json.patron_verificacion_detectado }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Verificador"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intencion === 'investigacion_externa' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Investigación externa"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Documental"
+        }
+      },
+      "id": "26ab73ab-f0b8-4a86-8b92-bf630eef567b",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -6416,
+        4640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json;\nconst documentos = Array.isArray(d.documentos) ? d.documentos : [];\nconst seminarios = Array.isArray(d.seminarios_detectados) ? d.seminarios_detectados : [];\nconst semA = seminarios[0] || null;\nconst semB = seminarios[1] || null;\nconst autor_a_encontrado = semA ? documentos.some(doc => doc.metadata && doc.metadata.seminario === semA) : false;\nconst autor_b_encontrado = semB ? documentos.some(doc => doc.metadata && doc.metadata.seminario === semB) : false;\nreturn [{json:{...d, documentos_comparador: documentos, seminario_a: semA, seminario_b: semB, autor_a_encontrado, autor_b_encontrado, autores_faltantes: []}}];"
+      },
+      "id": "3d2fa8d3-1832-45a7-95ba-6b83ed12abae",
+      "name": "Filtrar documentos - Comparador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        4736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const docs = Array.isArray($json.documentos) ? $json.documentos : [];\nconst seminarios = Array.isArray($json.seminarios_detectados) ? $json.seminarios_detectados : [];\nconst objetivo = seminarios.length === 1 ? seminarios[0] : null;\nreturn [{json:{...$json, documentos: docs, seminario_objetivo: objetivo, autor_objetivo: objetivo, autor_encontrado: docs.length > 0}}];"
+      },
+      "id": "114bd307-6d4b-445f-931d-d41f8125c7fc",
+      "name": "Filtrar documentos - Verificador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6176,
+        4352
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/customsearch/v1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cx",
+              "value": "94a90bfc73b7f4a3d"
+            },
+            {
+              "name": "q",
+              "value": "={{ $json.google_query }}"
+            },
+            {
+              "name": "num",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3fad3e7f-7759-45d8-9f7b-a8b379bfb26f",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -6176,
+        5104
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "1EuboLC0lYtzWZTH",
+          "name": "Google CSE Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.first().json.items||[]; const resultados=items.map(i=>`Fuente: ${i.title}\\nURL: ${i.link}\\nExtracto: ${i.snippet}`).join('\\n\\n'); return [{json:{busqueda_academica:resultados||'Sin resultados en fuentes externas.'}}];"
+      },
+      "id": "67f8724b-ae15-4a0c-8852-2e53a7f0aef3",
+      "name": "Code in JavaScript3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5920,
+        5104
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "e10d50c6-2b1f-4d33-8854-4008f205c063",
+      "name": "Merge1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -5696,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"model\":\"claude-sonnet-5\",\"max_tokens\":6000,\"system\":\"Sos el Investigador V1 de LACAN·LAB. Respondé usando exclusivamente los documentos adjuntos del corpus autorizado. Los resultados externos solo sirven como contexto de investigación cuando la intención sea investigacion_externa; no los conviertas en evidencia documental ni inventes citas. Conservá las citas nativas de Files API.\",\"messages\":[{\"role\":\"user\",\"content\":[...$json.documentos.map(d=>({type:d.type,source:d.source,title:d.title,citations:d.citations})),{type:\"text\",text:\"Resultados de búsqueda académica restringida a fuentes autorizadas:\\n\\n\"+($json.busqueda_academica||\"Sin búsqueda externa.\" )},{type:\"text\",text:$json.pregunta}]}]} }}",
+        "options": {}
+      },
+      "id": "e3dec196-4119-4598-952a-cf79b1918d1b",
+      "name": "V1 - Investigador (Sonnet)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5472,
+        4624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "U2F7MZKnON5352mv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $json.content || [];\nlet texto = '';\nconst citas = [];\nconst documentos = ($('Armar documentos (file_id)').item.json.documentos) || [];\nfor (const b of blocks) {\n  if (b.type === 'text') {\n    texto += b.text;\n    if (b.citations) for (const c of b.citations) {\n      const doc = (typeof c.document_index === 'number') ? documentos[c.document_index] : null;\n      const meta = doc && doc.metadata ? doc.metadata : null;\n      // OJO: nombre de campo de página sin confirmar contra una respuesta real de la API;\n      // se prueban los candidatos más probables y se conserva el objeto crudo igual.\n      const pagina_relativa = (typeof c.start_page_number === 'number') ? c.start_page_number\n        : (typeof c.page_number === 'number') ? c.page_number : null;\n      const pagina_original = (meta && pagina_relativa !== null) ? (meta.pagina_desde + pagina_relativa - 1) : null;\n      citas.push({\n        ...c,\n        documento_titulo: c.document_title || (doc ? doc.title : null),\n        seminario: meta ? meta.seminario : null,\n        archivo: meta ? meta.archivo : null,\n        pagina_relativa,\n        pagina_original\n      });\n    }\n  }\n}\nreturn [{json:{respuesta_v1_texto: texto, citas_v1: citas}}];"
+      },
+      "id": "8f740eff-a964-4d6f-b017-eae8dabd161c",
+      "name": "Extraer respuesta V1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5248,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":3000,\"system\":\"Sos el Auditor de Fuentes (V2) de LACAN·LAB. Revisás la respuesta del Investigador (V1). Como V1 usa citas nativas verificadas por la API, no chequees si las citas existen. Evaluá exclusivamente atribución correcta de conceptos, anacronismos, acuerdos artificiales y distinción entre fuente e inferencia. Devolvé un veredicto con semáforo verde, amarillo o rojo y una justificación breve.\",\"messages\":[{\"role\":\"user\",\"content\":\"Pregunta original: \"+$(\"Armar documentos (file_id)\").item.json.pregunta+\"\\n\\nRespuesta del Investigador (V1):\\n\"+$json.respuesta_v1_texto}]} }}",
+        "options": {}
+      },
+      "id": "acb73ed2-7c67-47c8-947e-00ecb872087d",
+      "name": "V2 - Auditor (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5024,
+        4624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "U2F7MZKnON5352mv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let auditoria=''; for(const b of ($json.content||[])) if(b.type==='text') auditoria+=b.text; return [{json:{pregunta:$('Armar documentos (file_id)').item.json.pregunta,respuesta_v1:$('Extraer respuesta V1').item.json.respuesta_v1_texto,citas_v1:$('Extraer respuesta V1').item.json.citas_v1,auditoria_v2:auditoria,tipo:'investigacion'}}];"
+      },
+      "id": "96ba5472-cbd0-4cb2-bda5-baf5d88142ef",
+      "name": "Extraer respuesta V2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4784,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":1024,\"system\":\"Sos un asistente especializado en comparar la obra de dos autores lacanianos a partir EXCLUSIVAMENTE de los documentos adjuntos. NUNCA atribuyas una idea a un autor si no aparece en SU documento. Si un concepto aparece en un solo documento, decilo explícitamente. Estructurá exactamente tres secciones: Coincidencias, Diferencias, Evolución del concepto (si aplica). Máximo 250 palabras. Devolvé ÚNICAMENTE JSON válido con respuesta_texto, citas, tipo comparacion, autor_a_encontrado y autor_b_encontrado.\",\"messages\":[{\"role\":\"user\",\"content\":[...$json.documentos_comparador.map(d=>({type:d.type,source:d.source,title:d.title,citations:d.citations})),{type:\"text\",text:$json.pregunta}]}]} }}",
+        "options": {}
+      },
+      "id": "42846de5-5708-4249-a27b-64c82873b907",
+      "name": "V3 - Comparador (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5696,
+        4880
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "U2F7MZKnON5352mv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$json.content?.[0]?.text||''; let p; try{p=JSON.parse(raw.replace(/^```json\\s*/i,'').replace(/```\\s*$/,'').trim())}catch(e){p={respuesta_texto:raw,citas:[],tipo:'comparacion',parseo_exitoso:false}} const o=$('Filtrar documentos - Comparador').item.json; return [{json:{pregunta:o.pregunta,autores_detectados:o.autores_detectados,autores_faltantes:o.autores_faltantes||[],respuesta_texto:String(p.respuesta_texto||'').replace(/<\\/?cite[^>]*>/g,''),citas:p.citas||[],tipo:'comparacion',autor_a_encontrado:o.autor_a_encontrado,autor_b_encontrado:o.autor_b_encontrado,es_paralelo:!!(o.dos_autores_detectados&&o.patron_verificacion_detectado)}}];"
+      },
+      "id": "d4bd8939-416d-4e6e-b21c-54669b0d97b9",
+      "name": "Extraer respuesta Comparador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5472,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":1024,\"system\":\"Sos un asistente especializado en verificar afirmaciones sobre autores lacanianos exclusivamente contra los documentos adjuntos. Si no hay evidencia, el veredicto es NO_ENCONTRADO. Si es parcial, PARCIALMENTE_CONFIRMADO. Devolvé ÚNICAMENTE JSON válido con veredicto, respuesta_texto, citas y tipo verificacion.\",\"messages\":[{\"role\":\"user\",\"content\":[...$json.documentos.map(d=>({type:d.type,source:d.source,title:d.title,citations:d.citations})),{type:\"text\",text:$json.pregunta}]}]} }}",
+        "options": {}
+      },
+      "id": "9928d94f-bb5f-4d80-a217-4e3b811d60e8",
+      "name": "V4 - Verificador (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5696,
+        4352
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "U2F7MZKnON5352mv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$json.content?.[0]?.text||''; let p; try{p=JSON.parse(raw.replace(/^```json\\s*/i,'').replace(/```\\s*$/,'').trim())}catch(e){p={veredicto:'NO_ENCONTRADO',respuesta_texto:raw,citas:[]}} const o=$('Filtrar documentos - Verificador').item.json; return [{json:{pregunta:o.pregunta,autor_objetivo:o.autor_objetivo,autor_encontrado:o.autor_encontrado,veredicto:p.veredicto,respuesta_texto:p.respuesta_texto,citas:p.citas||[],tipo:'verificacion',es_paralelo:!!(o.dos_autores_detectados&&o.patron_verificacion_detectado)}}];"
+      },
+      "id": "c839a418-52d8-4e51-aeeb-091ea696577f",
+      "name": "Extraer respuesta Verificador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5472,
+        4352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.es_paralelo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f413b8a-7c0a-46a7-bcac-36d105e9bb44",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5248,
+        4352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.es_paralelo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "677703af-154f-478c-9a9f-e5617839c1d0",
+      "name": "If1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5248,
+        4880
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "3f740022-5307-4120-a967-6d76a72351e6",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -5024,
+        4304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const v=$('Extraer respuesta Verificador').item.json; const c=$('Extraer respuesta Comparador').item.json; return [{json:{pregunta:v.pregunta||c.pregunta,tipo:'paralelo',autor_objetivo:v.autor_objetivo,autor_encontrado:v.autor_encontrado,veredicto:v.veredicto,respuesta_verificacion:v.respuesta_texto,citas_verificacion:v.citas||[],autores_detectados:c.autores_detectados,autores_faltantes:c.autores_faltantes||[],respuesta_comparacion:c.respuesta_texto,citas_comparacion:c.citas||[],autor_a_encontrado:c.autor_a_encontrado,autor_b_encontrado:c.autor_b_encontrado}}];"
+      },
+      "id": "97279e37-bdef-4788-9541-b479535d6732",
+      "name": "Code in JavaScript2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4784,
+        4304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "d24212fb-9739-499b-85e0-8352eb2495fa",
+      "name": "Responder al Usuario",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -4544,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst pregunta = String(item.pregunta || '');\nlet fileIds = item.file_ids && typeof item.file_ids === 'object' ? item.file_ids : {};\nif (!Object.keys(fileIds).length && $env.LACAN_FILE_IDS_JSON) { try { fileIds = JSON.parse($env.LACAN_FILE_IDS_JSON); } catch(e) {} }\nconst disponibles = [...new Set(Object.keys(fileIds).map(n => { const m=/^S0*(\\d{1,2})(bis)?_p\\d+-\\d+\\.pdf$/i.exec(n); return m ? String(Number(m[1]))+(m[2]?'bis':'') : null; }).filter(Boolean))];\nconst p = pregunta.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();\nconst found = new Set();\nfor (const m of p.matchAll(/\\bs0*(\\d{1,2})(bis)?\\b/gi)) found.add(String(Number(m[1]))+(m[2]?'bis':''));\nfor (const m of p.matchAll(/\\bseminario\\s+(?:n[º°]?\\s*)?0*(\\d{1,2})(?:\\s*(bis))?\\b/gi)) found.add(String(Number(m[1]))+(m[2]?'bis':''));\nconst explicitos = [...found].filter(x => disponibles.length ? disponibles.includes(x) : true);\nreturn [{json:{...item, file_ids:fileIds, seminarios_disponibles:disponibles, seminarios_explicitos:explicitos, seminarios_detectados:explicitos, tiene_seminario_explicito:explicitos.length>0, requiere_inferencia:explicitos.length===0}}];"
+      },
+      "id": "26211e07-5077-4fdc-9b99-7403ccf06317",
+      "name": "Detectar seminario explícito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7984,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tiene_seminario_explicito }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c669faf1-770b-47d1-8233-0f82045a3bc6",
+      "name": "IF seminario explícito",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -7744,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "files-api-2025-04-14"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: \"claude-haiku-4-5-20251001\", max_tokens: 300, system: \"Clasificá la pregunta documentalmente. Elegí como máximo dos seminarios únicamente de la lista disponible. No respondas la pregunta. Devolvé exclusivamente JSON válido con la forma {\\\"seminarios\\\":[\\\"11\\\"],\\\"confianza\\\":0.0,\\\"motivo\\\":\\\"breve\\\"}. Si no hay evidencia, seminarios debe ser [].\", messages:[{role:\"user\",content:\"Seminarios disponibles: \"+JSON.stringify($json.seminarios_disponibles||[])+\"\\nPregunta: \"+$json.pregunta}]} }}",
+        "options": {}
+      },
+      "id": "bf4dfbb7-c6e8-4abc-b216-b2b49c086dc4",
+      "name": "Inferir seminario (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -7456,
+        4368
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "U2F7MZKnON5352mv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst ctx = $('Detectar seminario explícito').first().json;\nconst text = (item.content||[]).filter(x=>x.type==='text').map(x=>x.text||'').join('').replace(/^```json\\s*/i,'').replace(/\\s*```$/,'').trim();\nlet parsed = {};\ntry { parsed = JSON.parse(text); } catch(e) {}\nconst allowed = new Set((ctx.seminarios_disponibles||[]).map(String));\nconst sem = Array.isArray(parsed.seminarios)\n  ? parsed.seminarios.map(String).map(x=>x.toLowerCase().trim()).filter(x=>allowed.has(x)).slice(0,2)\n  : [];\nreturn [{json:{...ctx, seminarios_detectados: sem, confianza_inferencia: Number.isFinite(Number(parsed.confianza)) ? Math.max(0, Math.min(1, Number(parsed.confianza))) : 0, inferencia_valida: sem.length>0}}];"
+      },
+      "id": "6a1901cd-5a15-4657-ab5a-c74443e9919d",
+      "name": "Parsear inferencia seminario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7264,
+        4368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.documentos_count > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3c0e9a4f-1173-4a6f-bcf3-3e2e4226b552",
+      "name": "IF corpus disponible",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -6608,
+        4256
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "cd987f77-62d7-4bbc-ae92-69d36672366e",
+      "name": "Responder error corpus",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -6464,
+        4912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Detecta si la pregunta involucra dos seminarios (para Comparador)\n// y si tiene forma de afirmación a verificar (para Verificador),\n// usando los seminarios YA detectados/inferidos mas arriba en el flujo\n// (Detectar seminario explicito / Parsear inferencia seminario),\n// en vez de una lista fija de autores/comentaristas que no tiene\n// sentido contra un corpus de fragmentos de seminarios.\nconst patrones = [/es cierto que/i,/es verdad que/i,/confirm[aá] si/i,/verific[aá] si/i,/¿(es|fue|dijo|plante[oó]|sostuvo)\\b.*\\?/i,/seg[uú]n lacan/i];\nconst pregunta = $json.pregunta;\nconst patron = patrones.some(r => r.test(pregunta));\nconst seminarios = Array.isArray($json.seminarios_detectados) ? $json.seminarios_detectados : [];\nreturn [{ json: { ...$json, dos_seminarios_detectados: seminarios.length >= 2, patron_verificacion_detectado: patron } }];"
+      },
+      "id": "8057f9ed-09ac-4808-9ac6-1cf13ef37f64",
+      "name": "Detectar patrón Comparador/Verificador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6624,
+        4640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "   const pregunta = $json.pregunta;\n   const preguntaValida = typeof pregunta === 'string' && pregunta.trim() !== '';\n   if (!preguntaValida) {\n     return [{json:{...$json, google_query_valida:false,\n       ok:false, error:{code:'GOOGLE_QUERY_INVALID',\n       message:'No se pudo armar la consulta a Google Custom Search: falta la pregunta.'}}}];\n   }\n   return [{json:{...$json, google_query: pregunta, google_query_valida:true}}];"
+      },
+      "id": "4696afcd-7fab-402d-a702-56486dc7ccc8",
+      "name": "Validar consulta Google",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        4912
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.google_query_valida }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aaf347f6-6cf0-4011-b9ac-34f3a5bea893",
+      "name": "IF Google válida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5952,
+        4896
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "KA6SnHiunjxgwH3p",
+          "mode": "list",
+          "cachedResultName": "lacan_file_ids",
+          "cachedResultUrl": "/projects/AcDlqOevS0oSCW9S/datatables/KA6SnHiunjxgwH3p"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7776,
+        4624
+      ],
+      "id": "bbf4bca8-b530-40d2-88ed-a384ce419520",
+      "name": "Leer tabla file_ids"
+    },
+    {
+      "parameters": {
+        "jsCode": "const filas = $input.all().map(i => i.json);\nconst file_ids = {};\nfor (const f of filas) {\n  if (f.archivo && f.file_id) file_ids[String(f.archivo)] = String(f.file_id);\n}\nconst base = $('Validar entrada').first().json;\nreturn [{ json: { ...base, file_ids, file_ids_count: Object.keys(file_ids).length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7552,
+        4624
+      ],
+      "id": "592f0db2-7367-4e9b-8099-f32bff55195b",
+      "name": "Armar mapa file_ids"
+    },
+    {
+      "parameters": {
+        "jsCode": "function tokenizar(texto) {\n  return (texto.toLowerCase().match(/[a-z\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00f1\\u00fc0-9]+/gi) || []);\n}\n\nconst ctx = $input.first().json;\nconst pregunta = String(ctx.pregunta || '');\nconst queryTerms = [...new Set(tokenizar(pregunta))];\n\nreturn [{ json: { ...ctx, bm25_query_terms: queryTerms } }];"
+      },
+      "id": "38959f1c-cb63-4abf-b08f-9a8956537531",
+      "name": "Preparar ranking BM25",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7056,
+        4464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "twHbLFL4ghK4Y1NO",
+          "mode": "list",
+          "cachedResultName": "lacan_bm25_idf",
+          "cachedResultUrl": "/projects/AcDlqOevS0oSCW9S/datatables/twHbLFL4ghK4Y1NO"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "termino",
+              "keyValue": "={{ $json.bm25_query_terms }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "ed229911-2a9e-483c-a4c3-a94971beafdd",
+      "name": "Leer tabla bm25_idf",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -6640,
+        4496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Ranking BM25 (Opcion A) -- VERSION DIAGNOSTICO =====\nconst K1 = 1.5;\nconst B = 0.75;\nconst TOP_K = 5;\nconst N_DOCS = 587;\nconst AVGDL = 5205.192504258944;\n\nconst ctx = $('Preparar ranking BM25').first().json;\nconst pregunta = String(ctx.pregunta || '');\nconst seminarios = Array.isArray(ctx.seminarios_detectados) ? ctx.seminarios_detectados.map(String) : [];\n\nconst fragmentos = $('Leer fragmentos seminario (BM25)').all().map(i => i.json);\nconst idfRows = $input.all().map(i => i.json);\n\nif (!seminarios.length) {\n  return [{ json: { ...ctx, fragmentos_seleccionados: [], fragmentos_bm25: [], bm25_top_k: TOP_K, bm25_pool_size: 0 } }];\n}\n\nfunction tokenizar(texto) {\n  return (texto.toLowerCase().match(/[a-z\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00f1\\u00fc0-9]+/gi) || []);\n}\nconst queryTerms = [...new Set(tokenizar(pregunta))];\n\nconst idfMap = {};\nfor (const r of idfRows) {\n  if (r.termino !== undefined && r.termino !== null) {\n    idfMap[String(r.termino)] = Number(r.idf_positive);\n  }\n}\n\nconst pool = fragmentos.filter(f => seminarios.includes(String(f.seminario)));\n\nfunction scoreBM25(termFreq, docLength) {\n  let score = 0;\n  for (const t of queryTerms) {\n    const idf = idfMap[t];\n    if (!idf) continue;\n    const tf = Number(termFreq[t] || 0);\n    if (!tf) continue;\n    const numerador = tf * (K1 + 1);\n    const denominador = tf + K1 * (1 - B + B * (docLength / AVGDL));\n    score += idf * (numerador / denominador);\n  }\n  return score;\n}\n\nlet parseErrores = 0;\nlet primerError = null;\n\nconst ranked = pool.map(f => {\n  let tf = {};\n  try {\n    tf = JSON.parse(f.term_freq_json || '{}');\n  } catch (e) {\n    parseErrores++;\n    if (!primerError) primerError = String(e.message);\n  }\n  const docLength = Number(f.doc_length || 0);\n  return { ...f, bm25_score: scoreBM25(tf, docLength) };\n}).sort((a, b) => b.bm25_score - a.bm25_score);\n\nconst seleccionados = ranked.slice(0, TOP_K);\n\nconst primero = pool[0] || {};\nconst s = String(primero.term_freq_json || '');\nlet tfPrimero = null;\ntry { tfPrimero = JSON.parse(s); } catch (e) {}\n\nconst debug = {\n  parse_errores: parseErrores,\n  primer_error: primerError,\n  idf_por_termino: Object.fromEntries(queryTerms.map(t => [t, idfMap[t] ?? null])),\n  primer_fragmento: primero.archivo || null,\n  tipo_term_freq_json: typeof primero.term_freq_json,\n  largo_term_freq_json: s.length,\n  ultimos_40_caracteres: s.slice(-40),\n  cantidad_terminos_tf: tfPrimero ? Object.keys(tfPrimero).length : -1,\n  tf_de_terminos_query: tfPrimero ? Object.fromEntries(queryTerms.map(t => [t, tfPrimero[t] ?? 0])) : null,\n  doc_length_primero: primero.doc_length ?? null\n};\n\nreturn [{\n  json: {\n    ...ctx,\n    fragmentos_seleccionados: seleccionados.map(f => f.archivo),\n    fragmentos_bm25: seleccionados.map(f => ({ archivo: f.archivo, seminario: f.seminario, score: f.bm25_score })),\n    bm25_top_k: TOP_K,\n    bm25_pool_size: pool.length,\n    bm25_query_terms: queryTerms,\n    bm25_debug: debug\n  }\n}];"
+      },
+      "id": "cfcd936e-b821-4577-88bc-0ef495fec9dc",
+      "name": "Rankear fragmentos BM25",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6352,
+        4464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YST6HQYeoTw5x775",
+          "mode": "list",
+          "cachedResultName": "lacan_fragment_index",
+          "cachedResultUrl": "/projects/AcDlqOevS0oSCW9S/datatables/YST6HQYeoTw5x775"
+        },
+        "returnAll": true
+      },
+      "id": "f6891764-c485-443c-a506-690bbbc20833",
+      "name": "Leer fragmentos seminario (BM25)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -6848,
+        4320
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "bm25_query_terms",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -6848,
+        4496
+      ],
+      "id": "c904e202-6f7f-4cb9-b394-9bd26192ef82",
+      "name": "Split Out"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (Pregunta)": {
+      "main": [
+        [
+          {
+            "node": "Validar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar entrada": {
+      "main": [
+        [
+          {
+            "node": "IF entrada válida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF entrada válida": {
+      "main": [
+        [
+          {
+            "node": "Leer tabla file_ids",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder error entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar documentos (file_id)": {
+      "main": [
+        [
+          {
+            "node": "IF corpus disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar intención": {
+      "main": [
+        [
+          {
+            "node": "Detectar patrón Comparador/Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Filtrar documentos - Verificador",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtrar documentos - Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filtrar documentos - Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filtrar documentos - Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar consulta Google",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "V1 - Investigador (Sonnet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar documentos - Comparador": {
+      "main": [
+        [
+          {
+            "node": "V3 - Comparador (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V3 - Comparador (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta Comparador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta Comparador": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar documentos - Verificador": {
+      "main": [
+        [
+          {
+            "node": "V4 - Verificador (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V4 - Verificador (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta Verificador": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "V1 - Investigador (Sonnet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V1 - Investigador (Sonnet)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta V1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta V1": {
+      "main": [
+        [
+          {
+            "node": "V2 - Auditor (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V2 - Auditor (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Extraer respuesta V2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer respuesta V2": {
+      "main": [
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar seminario explícito": {
+      "main": [
+        [
+          {
+            "node": "IF seminario explícito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF seminario explícito": {
+      "main": [
+        [
+          {
+            "node": "Preparar ranking BM25",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inferir seminario (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inferir seminario (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Parsear inferencia seminario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear inferencia seminario": {
+      "main": [
+        [
+          {
+            "node": "Preparar ranking BM25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF corpus disponible": {
+      "main": [
+        [
+          {
+            "node": "Clasificar intención",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder error corpus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar patrón Comparador/Verificador": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar consulta Google": {
+      "main": [
+        [
+          {
+            "node": "IF Google válida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Google válida": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tabla file_ids": {
+      "main": [
+        [
+          {
+            "node": "Armar mapa file_ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar mapa file_ids": {
+      "main": [
+        [
+          {
+            "node": "Detectar seminario explícito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar ranking BM25": {
+      "main": [
+        [
+          {
+            "node": "Leer fragmentos seminario (BM25)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tabla bm25_idf": {
+      "main": [
+        [
+          {
+            "node": "Rankear fragmentos BM25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rankear fragmentos BM25": {
+      "main": [
+        [
+          {
+            "node": "Armar documentos (file_id)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer fragmentos seminario (BM25)": {
+      "main": [
+        []
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Leer tabla bm25_idf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "daa34fbc-0c82-4674-bbc0-410558e8d8f1",
+  "meta": {
+    "instanceId": "553b6f97d81083b58ec1c5db8286003e728294b55cd19a8895075c60dc98e143"
+  },
+  "nodeGroups": [],
+  "id": "abUS7IXNmrdjZZt1",
+  "tags": []
+}

@@ -1,0 +1,310 @@
+{
+  "name": "LACAN-LAB V1+V2 (POST) - con citas nativas",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lacan-lab",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook1",
+      "name": "Webhook (Pregunta)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 560]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PEGAR_FILE_ID_BASSOLS"
+        },
+        "options": { "binaryPropertyName": "data" }
+      },
+      "id": "gdrive1",
+      "name": "PDF - Bassols",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 120],
+      "credentials": { "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PEGAR_FILE_ID_SCHEJTMAN"
+        },
+        "options": { "binaryPropertyName": "data" }
+      },
+      "id": "gdrive2",
+      "name": "PDF - Schejtman",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 300],
+      "credentials": { "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PEGAR_FILE_ID_GEBLESCO"
+        },
+        "options": { "binaryPropertyName": "data" }
+      },
+      "id": "gdrive3",
+      "name": "PDF - Geblesco",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 480],
+      "credentials": { "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PEGAR_FILE_ID_DOC4"
+        },
+        "options": { "binaryPropertyName": "data" }
+      },
+      "id": "gdrive4",
+      "name": "PDF - Doc 4",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 660],
+      "credentials": { "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PEGAR_FILE_ID_DOC5"
+        },
+        "options": { "binaryPropertyName": "data" }
+      },
+      "id": "gdrive5",
+      "name": "PDF - Doc 5",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 840],
+      "credentials": { "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "titulo", "value": "Bassols", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set1",
+      "name": "Titulo - Bassols",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 120]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "titulo", "value": "Schejtman", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set2",
+      "name": "Titulo - Schejtman",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "titulo", "value": "Geblesco", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set3",
+      "name": "Titulo - Geblesco",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 480]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "titulo", "value": "Documento 4", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set4",
+      "name": "Titulo - Doc 4",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 660]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "titulo", "value": "Documento 5", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set5",
+      "name": "Titulo - Doc 5",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 840]
+    },
+    {
+      "parameters": {
+        "numberInputs": 5,
+        "mode": "append"
+      },
+      "id": "merge1",
+      "name": "Merge - Corpus",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [900, 480]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const documentos = items.map(item => {\n  const binary = item.binary.data;\n  return {\n    type: 'document',\n    source: {\n      type: 'base64',\n      media_type: 'application/pdf',\n      data: binary.data\n    },\n    title: item.json.titulo,\n    citations: { enabled: true },\n    cache_control: { type: 'ephemeral' }\n  };\n});\n\nconst pregunta = $('Webhook (Pregunta)').item.json.body.question;\n\nreturn [{ json: { documentos, pregunta } }];"
+      },
+      "id": "code1",
+      "name": "Armar documentos para Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-sonnet-5\",\n  max_tokens: 4096,\n  system: \"Sos el Investigador de Fuentes de LACAN·LAB. Respondé EXCLUSIVAMENTE con base en los documentos adjuntos (corpus lacaniano). Si no hay evidencia para responder, decí literalmente: NO ENCONTRADO EN LAS FUENTES DISPONIBLES. Estructurá siempre la respuesta en tres partes: 1) Evidencia directa (cita textual con autor, obra y página cuando sea posible), 2) Inferencia o síntesis (marcando explícitamente que es una deducción tuya y no una cita), 3) Limitaciones (qué no se puede afirmar con las fuentes disponibles). No mezcles conceptos de distintos autores como si fueran equivalentes salvo que el corpus lo haga explícito.\",\n  messages: [\n    {\n      role: \"user\",\n      content: [...$json.documentos, { type: \"text\", text: $json.pregunta }]\n    }\n  ]\n} }}"
+      },
+      "id": "http1",
+      "name": "V1 - Investigador (Sonnet)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 480],
+      "credentials": { "anthropicApi": { "id": "", "name": "Anthropic account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const blocks = $json.content || [];\nlet texto = '';\nconst citas = [];\n\nfor (const block of blocks) {\n  if (block.type === 'text') {\n    texto += block.text;\n    if (block.citations) {\n      for (const c of block.citations) {\n        citas.push({\n          texto_citado: c.cited_text,\n          documento: c.document_title || c.document_index\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { respuesta_v1_texto: texto, citas_v1: citas } }];"
+      },
+      "id": "code2",
+      "name": "Extraer respuesta V1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"claude-haiku-4-5-20251001\",\n  max_tokens: 2048,\n  system: \"Sos el Auditor de Fuentes (V2) de LACAN·LAB. Revisás la respuesta del Investigador (V1). Como V1 usa citas nativas verificadas por la API, NO necesitás chequear si las citas existen o si las páginas son correctas: eso ya está garantizado estructuralmente. Tu trabajo se concentra en un solo eje: TEORIA. Evaluá: atribución correcta de conceptos a sus autores (no mezclar Lacan con Miller, ni Freud con Schejtman salvo que el corpus lo indique), anacronismos conceptuales, acuerdos artificiales entre autores donde no los hay, y si V1 distingue claramente entre lo que la fuente dice literalmente y lo que infiere. Formato de salida: veredicto con semaforo (verde/amarillo/rojo) y un parrafo breve de justificacion. No agregues ejes de fuentes ni alucinacion.\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Pregunta original: \" + $('Armar documentos para Claude').item.json.pregunta + \"\\n\\nRespuesta del Investigador (V1):\\n\" + $json.respuesta_v1_texto\n    }\n  ]\n} }}"
+      },
+      "id": "http2",
+      "name": "V2 - Auditor (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 480],
+      "credentials": { "anthropicApi": { "id": "", "name": "Anthropic account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const blocks = $json.content || [];\nlet auditoria = '';\nfor (const block of blocks) {\n  if (block.type === 'text') auditoria += block.text;\n}\n\nreturn [{\n  json: {\n    pregunta: $('Armar documentos para Claude').item.json.pregunta,\n    respuesta_v1: $('Extraer respuesta V1').item.json.respuesta_v1_texto,\n    citas_v1: $('Extraer respuesta V1').item.json.citas_v1,\n    auditoria_v2: auditoria\n  }\n}];"
+      },
+      "id": "code3",
+      "name": "Extraer respuesta V2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond1",
+      "name": "Responder al Usuario",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2220, 480]
+    }
+  ],
+  "connections": {
+    "Webhook (Pregunta)": {
+      "main": [
+        [
+          { "node": "PDF - Bassols", "type": "main", "index": 0 },
+          { "node": "PDF - Schejtman", "type": "main", "index": 0 },
+          { "node": "PDF - Geblesco", "type": "main", "index": 0 },
+          { "node": "PDF - Doc 4", "type": "main", "index": 0 },
+          { "node": "PDF - Doc 5", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "PDF - Bassols": { "main": [[{ "node": "Titulo - Bassols", "type": "main", "index": 0 }]] },
+    "PDF - Schejtman": { "main": [[{ "node": "Titulo - Schejtman", "type": "main", "index": 0 }]] },
+    "PDF - Geblesco": { "main": [[{ "node": "Titulo - Geblesco", "type": "main", "index": 0 }]] },
+    "PDF - Doc 4": { "main": [[{ "node": "Titulo - Doc 4", "type": "main", "index": 0 }]] },
+    "PDF - Doc 5": { "main": [[{ "node": "Titulo - Doc 5", "type": "main", "index": 0 }]] },
+    "Titulo - Bassols": { "main": [[{ "node": "Merge - Corpus", "type": "main", "index": 0 }]] },
+    "Titulo - Schejtman": { "main": [[{ "node": "Merge - Corpus", "type": "main", "index": 1 }]] },
+    "Titulo - Geblesco": { "main": [[{ "node": "Merge - Corpus", "type": "main", "index": 2 }]] },
+    "Titulo - Doc 4": { "main": [[{ "node": "Merge - Corpus", "type": "main", "index": 3 }]] },
+    "Titulo - Doc 5": { "main": [[{ "node": "Merge - Corpus", "type": "main", "index": 4 }]] },
+    "Merge - Corpus": { "main": [[{ "node": "Armar documentos para Claude", "type": "main", "index": 0 }]] },
+    "Armar documentos para Claude": { "main": [[{ "node": "V1 - Investigador (Sonnet)", "type": "main", "index": 0 }]] },
+    "V1 - Investigador (Sonnet)": { "main": [[{ "node": "Extraer respuesta V1", "type": "main", "index": 0 }]] },
+    "Extraer respuesta V1": { "main": [[{ "node": "V2 - Auditor (Haiku)", "type": "main", "index": 0 }]] },
+    "V2 - Auditor (Haiku)": { "main": [[{ "node": "Extraer respuesta V2", "type": "main", "index": 0 }]] },
+    "Extraer respuesta V2": { "main": [[{ "node": "Responder al Usuario", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
